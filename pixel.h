@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL.h>
+#include <SDL_image.h>
 #include "logs.h"
 
 #ifdef LOGS
@@ -10,33 +11,42 @@
 
 namespace tetris
 {
-	struct pixel
+
+	struct matrixPixel
 	{
+		int row{ 0 };
+		int col{ 0 };
+		bool filled{ false };
+
+#ifdef LOGS
+		friend std::ostream& operator<<(std::ostream& os, const matrixPixel& mp);
+#endif
+	};
+
+	struct texturePixel
+	{
+		SDL_Texture* pixelTexture{ nullptr };
+		SDL_Rect sourceRect{};
 		SDL_Rect pixelRect{};
+		//bool filled{ false };
 		int row{ 0 };
 		int col{ 0 };
 
+		~texturePixel()
+		{
+			pixelTexture = nullptr;
+		}
+
+		texturePixel& operator=(const matrixPixel& mp);
+
+
+
 #ifdef LOGS
-		friend std::ostream& operator<<(std::ostream& os, const pixel& p);
+		friend std::ostream& operator<<(std::ostream& os, const texturePixel& p);
 #endif
 	};
 
-	class PixelArray
-	{
-	private:
-		pixel* pixelArray{ nullptr };
-		int    pixelArrayLength{ 0 };
-	public:
-		PixelArray(int pixelArrayLength);
-		~PixelArray();
-		PixelArray(const PixelArray&) = delete;
-		PixelArray& operator=(const PixelArray&) = delete;
-		PixelArray(PixelArray&&) = delete;
-		pixel* operator[](const int index);
-		pixel* GetArray() { return pixelArray; }
 
-#ifdef LOGS
-		friend std::ostream& operator<<(std::ostream& os, const PixelArray& pa);
-#endif
-	};
+
+
 }
