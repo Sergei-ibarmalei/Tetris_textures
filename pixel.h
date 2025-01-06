@@ -38,6 +38,8 @@ namespace tetris
 		}
 
 		texturePixel& operator=(const matrixPixel& mp);
+		operator int() const;
+
 
 
 

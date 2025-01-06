@@ -42,6 +42,10 @@ namespace tetris
 		Tetramino* operator[](const TetraminoKind r);
 		SDL_Texture* operator[](const TexturesStorageNames name);
 		bool InitOk() const { return initOk; }
+
+
+		SDL_Rect* RectStorage() const { return rectStorage; }
+		SDL_Texture** AllTextures()  { return allTextures; }
 	};
 
 

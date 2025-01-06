@@ -13,23 +13,29 @@ namespace tetris
 		Storage* storage{ nullptr };
 		TetrisRoom* tetrisRoom{ nullptr };
 		Tetramino* currentTetramino{ nullptr };
+
 		WorkSpace* workSpace{ nullptr };
-		TRandom trandom;
+
 		SDL_Renderer* tetrisRender{ nullptr };
 		SDL_Event e;
+		TRandom trandom;
+		Timer sessionTimer;
+		Timer pauseBeforeDeletionTimer;
 
 		bool initOk{ true };
 		bool flowQuit{ false };
 		bool sessionQuit{ false };
 
+		
 		void projectTetraminoToVirtual();
-		bool makeTetramino();
 		void runSession();
 		void checkPressedKeys();
 		void renderScreen();
 		void move(Direction dir);
 		void rotateClockWise();
 		void rotateCounterClockWise();
+		void moveDown();
+		Tetramino* makeCurrentTetramino();
 
 
 	public:

@@ -6,39 +6,8 @@ static SDL_Point startWallsLeftUp{ LEFTWALL_LEFTX, LEFTWALL_LEFTY };
 static SDL_Point startWallsDownUp{ DOWNWALL_LEFTX, DOWNWALL_LEFTY };
 static SDL_Point startWallsRightUp{ RIGHTWALL_LEFTX, RIGHTWALL_LEFTY };
 
-//enum class direction {right, left, down, all};
+static tetris::matrixPixel sample[REALTETRAMINO_LENGTH]{};
 
-//static void shiftTetraminoLeft(tetris::matrixPixel* matrix,
-//	const int matrixLength)
-//{
-//	if (!matrix)
-//	{
-//#ifdef LOGS
-//		std::cerr << "Cannot shift, data is absent.\n";
-//#endif
-//		return;
-//	}
-//	for (int i = 0; i < matrixLength; ++i)
-//	{
-//		matrix[i].col--;
-//	}
-//}
-//
-//void shiftTetraminoRight(tetris::matrixPixel* matrix,
-//	const int matrixLength)
-//{
-//	if (!matrix)
-//	{
-//#ifdef LOGS
-//		std::cerr << "Cannot shift, data is absent.\n";
-//#endif
-//		return;
-//	}
-//	for (int i = 0; i < matrixLength; ++i)
-//	{
-//		matrix[i].col++;
-//	}
-//}
 
 bool checkHitWall(tetris::Direction dir, tetris::texturePixel* tetramino, 
 	const tetris::texturePixel* workSpace)
@@ -130,16 +99,36 @@ void geomtryInitRoom(tetris::texturePixel* room)
 			room[AT].pixelRect.w =
 				room[AT].pixelRect.h =
 				ROOMPIXELSIDE;
+			
 		}
 	}
 }
 
 void Showing(SDL_Renderer* render, tetris::texturePixel* array, const int length)
 {
-	if (!render || !array) return; 
+	//if (!render || !array) return; 
+	if (!render)
+	{
+#ifdef LOGS
+		std::cerr << "Render is absent, error.\n";
+#endif
+		return;
+	}
+	if (!array)
+	{
+#ifdef LOGS
+		std::cerr << "Data is absent, error.\n";
+#endif
+		return;
+	}
 
 	for (int i = 0; i < length; ++i)
 	{
+		auto r = render;
+		auto pt = array[i].pixelTexture;
+		auto sr = array[i].sourceRect;
+		auto pr = array[i].pixelRect;
+
 		if (array[i].pixelTexture)
 			SDL_RenderCopy(render, array[i].pixelTexture, &array[i].sourceRect,
 				&array[i].pixelRect);
@@ -516,6 +505,48 @@ namespace tetris
 			}
 			break;
 		}
+		case Direction::drop:
+		{
+			int dropPath = 0;
+			for (int i = 0; i < REALTETRAMINO_LENGTH; ++i)
+			{
+				sample[i].row = realTetramino[i].row;
+				sample[i].col = realTetramino[i].col;
+			}
+
+			while (true)
+			{
+				for (int i = 0; i < REALTETRAMINO_LENGTH; ++i)
+				{
+					const auto nextRow = sample[i].row + 1;
+					const auto nextCol = sample[i].col;
+					const auto AT = nextRow * ROOMWIDTH_PIXELS + nextCol;
+					if (workSpace[AT].pixelTexture || nextRow == ROOMHEIGHT_PIXELS)
+					{
+						goto EXIT;
+					}
+					else
+					{
+						sample[i].row += 1;
+					}
+				}
+				dropPath++;
+
+			}
+		EXIT:
+
+			if (dropPath)
+			{
+				for (int i = 0; i < REALTETRAMINO_LENGTH; ++i)
+				{
+					realTetramino[i].row += (dropPath);
+				}
+			}
+			this->fixed = true;
+			recomputeRects();
+			return;
+			break;
+		}
 		default:
 			break;
 		}
@@ -693,31 +724,110 @@ namespace tetris
 	}
 
 
-	void WorkSpace::WorkSpaceOperate(const texturePixel* realTetramino,
-		WorkSpaceOperation op)
+	// project real tetramino on workSpace:
+	void WorkSpace::WorkSpaceOperate(const texturePixel* realTetramino)
+		//WorkSpaceOperation op)
 	{
 		for (int i = 0; i < REALTETRAMINO_LENGTH; ++i)
 		{
-			const auto AT = realTetramino[i].row * ROOMWIDTH_PIXELS +
-				realTetramino[i].col;
+			const auto AT = realTetramino[i].row * ROOMWIDTH_PIXELS + realTetramino[i].col;
+			workSpace[AT].pixelRect = realTetramino[i].pixelRect;
+			workSpace[AT].sourceRect = realTetramino[i].sourceRect;
+			workSpace[AT].pixelTexture = realTetramino[i].pixelTexture;
 
-			switch (op)
+			// icrease valuesOfRows at each realtetramino row by one:
+			valuesOfRows[realTetramino[i].row] += 1;
+		}
+
+
+	}
+
+	bool WorkSpace::CheckForCombo()
+	{
+
+		lowest = ROOMHEIGHT_PIXELS - 1;
+		lowvalue = valuesOfRows[lowest];
+		for (int r = lowest - 1; r >= 0; --r)
+		{
+			if (valuesOfRows[r] > lowvalue)
 			{
-			case WorkSpaceOperation::deletion:
-			{
-				workSpace[AT].pixelTexture = nullptr;
+				lowest = r;
+				lowvalue = valuesOfRows[r];
 				break;
 			}
-			case WorkSpaceOperation::projection:
+		}
+		if (valuesOfRows[lowest] < 10) return false;
+		return true;
+	}
+
+	void WorkSpace::DoCombo()
+	{
+
+		for (int r = lowest - 1; r >= 0; --r)
+		{
+			if (valuesOfRows[r] < 10)
 			{
-				workSpace[AT].pixelRect = realTetramino[i].pixelRect;
-				workSpace[AT].sourceRect = realTetramino[i].sourceRect;
-				workSpace[AT].pixelTexture = realTetramino[i].pixelTexture;
+				highest = r + 1;
 				break;
 			}
-			default:
-				break;
+		}
+
+		// deleting:
+		int deletingCount{ 0 };
+		for (int dr = highest; dr <= lowest; ++dr)
+		{
+			deletingCount++;
+			valuesOfRows[dr] = 0;
+			for (int c = 0; c < ROOMWIDTH_PIXELS; ++c)
+			{
+				workSpace[dr * ROOMWIDTH_PIXELS + c].pixelTexture = nullptr;
 			}
+		}
+
+		for (int r = highest - 1; r > 0; --r)
+		{
+			if (valuesOfRows[r] > 0)
+			{
+				for (int c = 0; c < ROOMWIDTH_PIXELS; ++c)
+				{
+					workSpace[(r + deletingCount) * ROOMWIDTH_PIXELS + c].pixelTexture =
+						workSpace[r * ROOMWIDTH_PIXELS + c].pixelTexture;
+					workSpace[(r + deletingCount) * ROOMWIDTH_PIXELS + c].sourceRect =
+						workSpace[r * ROOMWIDTH_PIXELS + c].sourceRect;
+					workSpace[r * ROOMWIDTH_PIXELS + c].pixelTexture = nullptr;
+				}
+			}
+		}
+
+		// recount valuesOfRows:
+		for (int i = 0; i < ROOMHEIGHT_PIXELS; ++i)
+		{
+			int sum{ 0 };
+			for (int c = 0; c < ROOMWIDTH_PIXELS; ++c)
+			{
+				sum += static_cast<int>(workSpace[i * ROOMWIDTH_PIXELS + c]);
+			}
+			valuesOfRows[i] = sum;
+		}
+	}
+
+	bool WorkSpace::HasEnoughPlaceForNew(const texturePixel* realTetramino)
+	{
+		for (int i = 0; i < REALTETRAMINO_LENGTH; ++i)
+		{
+			const auto currentRow = realTetramino[i].row;
+			const auto currentCol = realTetramino[i].col;
+			if (workSpace[currentRow * ROOMWIDTH_PIXELS + currentCol].pixelTexture)
+				return false;
+		}
+		return true;
+	}
+
+	void WorkSpace::ClearValuesOfRows()
+	{
+		for (int i = 0; i < ROOMHEIGHT_PIXELS; ++i)
+		{
+			valuesOfRows[i] = 0;
 		}
 	}
 
@@ -726,6 +836,7 @@ namespace tetris
 	{
 		delete[] workSpace;
 		workSpace = nullptr;
+		render = nullptr;
 	}
 
 
@@ -740,5 +851,19 @@ namespace tetris
 	{
 		return os << *tr.tetrisRoomPixelArray;
 	}
+
+
+	std::ostream& operator<<(std::ostream& os, const WorkSpace& ws)
+	{
+		for (int i = 0; i < ROOMHEIGHT_PIXELS; ++i)
+		{
+			os << "[row: " << i << "] value: " << ws.valuesOfRows[i] << '\n';
+		}
+		os << "===============\n";
+		os << "lowest row to delete: " << ws.lowest << '\n';
+		os << "highest row to delete: " << ws.highest << '\n';
+		return os;
+	}
+
 #endif
 }

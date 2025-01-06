@@ -18,6 +18,6 @@ namespace tetris
 	enum class TetrisTextureRects {l, g, right, left,
 	cube, plane, t, room, wall, all};
 	enum class TexturesStorageNames {tetris, all};
-	enum class Direction {right, left, down, all};
+	enum class Direction {right, left, down, drop, all};
 
 }

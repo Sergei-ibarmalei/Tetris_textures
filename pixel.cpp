@@ -10,6 +10,16 @@ namespace tetris
 		return *this;
 	}
 
+	texturePixel::operator int() const
+	{
+		if (pixelTexture) return 1;
+		else return 0;
+	}
+
+
+
+
+
 #ifdef LOGS
 	std::ostream& operator<<(std::ostream& os, const texturePixel& p)
 	{

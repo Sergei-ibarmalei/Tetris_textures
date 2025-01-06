@@ -46,6 +46,8 @@ namespace tetris
 		
 	}
 
+
+
 	bool Storage::checkData(const char* fileName, uint8_t* buffer,
 		size_t bufferLength, const uint32_t expectedCRC)
 	{

@@ -122,6 +122,7 @@ namespace tetris
 		~Tetramino();
 		bool InitOk() const { return initOk; }
 		bool Fixed()  const { return fixed; }
+		void Unfix() { fixed = false; }
 		void Show();
 		void Move(Direction dir, const texturePixel* workSpace);
 		void RotateClockWise(const texturePixel* workSpace);
@@ -245,13 +246,17 @@ namespace tetris
 				initPointsLength) {}
 	};
 
-	enum class WorkSpaceOperation {deletion, projection, all};
+	//enum class WorkSpaceOperation {deletion, projection, all};
 
 	class WorkSpace
 	{
 	private:
 		texturePixel* workSpace{ nullptr };
 		SDL_Renderer* render{ nullptr };
+		int lowest{ 0 };
+		int highest{ 0 };
+		int lowvalue{ 0 };
+		int valuesOfRows[ROOMHEIGHT_PIXELS]{};
 		bool initOk{ true };
 	public:
 		WorkSpace(SDL_Renderer* render);
@@ -260,11 +265,17 @@ namespace tetris
 		WorkSpace(WorkSpace&&) = delete;
 		~WorkSpace();
 		bool InitOK() const { return initOk; }
-		void WorkSpaceOperate(const texturePixel* realTetramino,
-			WorkSpaceOperation op);
+		void WorkSpaceOperate(const texturePixel* realTetramino);
 		texturePixel* GetWorkSpace() const { return workSpace; }
 		void Show();
+		bool CheckForCombo();
+		void DoCombo();
+		bool HasEnoughPlaceForNew(const texturePixel* realTetramino);
+		void ClearValuesOfRows();
 
+#ifdef LOGS
+		friend std::ostream& operator<<(std::ostream& os, const WorkSpace& ws);
+#endif
 
 	};
 

@@ -1,5 +1,9 @@
 #include "prog.h"
 
+static int moveDuration{ 1000 };
+static int freezeDeleting{ 500 };
+
+
 namespace tetris
 {
 	Prog::Prog(SDL_Renderer* render)
@@ -37,15 +41,15 @@ namespace tetris
 		if (!workSpace || workSpace->InitOK() == false)
 		{
 #ifdef LOGS
-			std::cerr << "Cannot create tetris prog, making workspace is damaged.\n";
+			std::cerr << "Cannot create tetris prog, " << 
+				"making workspace is damaged.\n";
 #endif
 			initOk = false; return;
 		}
-		if (!makeTetramino())
+
+		currentTetramino = makeCurrentTetramino();
+		if (!currentTetramino)
 		{
-#ifdef LOGS
-			std::cerr << "Cannot make tetramino, abort.\n";
-#endif
 			initOk = false; return;
 		}
 
@@ -54,12 +58,60 @@ namespace tetris
 
 	void Prog::runSession()
 	{
+#ifdef TIMER
+		sessionTimer.start(moveDuration);
+#endif
+
 		while (sessionQuit == false)
 		{
+#ifdef TIMER
+			if (sessionTimer.hasElapsed())
+			{
+				moveDown();
+				sessionTimer.reset();
+				sessionTimer.start(moveDuration);
+			}
+#endif
+
 			checkPressedKeys();
+
+			if (currentTetramino->Fixed())
+			{
+
+				projectTetraminoToVirtual();
+				if (workSpace->CheckForCombo())
+				{
+//#ifdef TIMER
+					pauseBeforeDeletionTimer.start(freezeDeleting);
+					while(!pauseBeforeDeletionTimer.hasElapsed())
+					{
+						renderScreen();
+					}
+					pauseBeforeDeletionTimer.reset();
+//#endif
+					workSpace->DoCombo();
+				}
+				delete currentTetramino;
+				currentTetramino = nullptr;
+				currentTetramino = makeCurrentTetramino();
+				if (!currentTetramino)
+				{
+					initOk = false; return;
+				}
+				if (!workSpace->HasEnoughPlaceForNew(currentTetramino->RealTetramino()))
+				{
+					sessionQuit = true;
+					goto EXIT_WHILE;
+				}
+
+			}
+
 			renderScreen();
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
+	EXIT_WHILE:
+		return;
+
 	}
 
 	void Prog::renderScreen()
@@ -70,6 +122,12 @@ namespace tetris
 		currentTetramino->Show();
 		workSpace->Show();
 		SDL_RenderPresent(tetrisRender);
+	}
+
+	void Prog::moveDown()
+	{
+		if (!currentTetramino->Fixed())
+			move(Direction::down);
 	}
 
 	void Prog::checkPressedKeys()
@@ -84,9 +142,15 @@ namespace tetris
 				case SDLK_p:
 				{
 #ifdef LOGS	
-					std::cout << *currentTetramino;
+					//std::cout << *currentTetramino;
+					std::cout << *workSpace << std::endl;
 					
 #endif
+					break;
+				}
+				case SDLK_SPACE:
+				{
+					move(Direction::drop);
 					break;
 				}
 				case SDLK_d:
@@ -127,69 +191,84 @@ namespace tetris
 		}
 	}
 
-
-
-	bool Prog::makeTetramino()
+	Tetramino* Prog::makeCurrentTetramino()
 	{
+//#ifdef LOGS
+//		std::cout << "makeCurrentTetramino\n";
+//#endif
+#define int_ static_cast<int>
 		int randomNumber = trandom.GetRandom();
-		bool success{ true };
-		//currentTetramino =
-			//static_cast<TetraminoT*>(storage->operator[](TetraminoKind::t));
+		Tetramino* currentTetramino{ nullptr };
 		switch (randomNumber)
 		{
 		case planeTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoPlane*>(storage->operator[](TetraminoKind::plane));
+			currentTetramino = new TetraminoPlane(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::plane)], planeInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case cubeTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoCube*>(storage->operator[](TetraminoKind::cube));
+			currentTetramino = new TetraminoCube(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::cube)], cubeInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case lTetramino:
-		{	currentTetramino =
-			static_cast<TetraminoL*>(storage->operator[](TetraminoKind::l));
+		{
+			currentTetramino = new TetraminoL(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::l)], lInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case gTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoG*>(storage->operator[](TetraminoKind::g));
+			currentTetramino = new TetraminoG(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::g)], gInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case rightTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoRight*>(storage->operator[](TetraminoKind::right));
+			currentTetramino = new TetraminoRight(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::right)], rightInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case leftTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoLeft*>(storage->operator[](TetraminoKind::left));
+			currentTetramino = new TetraminoLeft(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::left)], leftInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
 		case tTetramino:
 		{
-			currentTetramino =
-				static_cast<TetraminoT*>(storage->operator[](TetraminoKind::t));
+			currentTetramino = new TetraminoT(storage->AllTextures()[int_(TexturesStorageNames::tetris)], tetrisRender,
+				storage->RectStorage()[int_(TetrisTextureRects::t)], tInits, initsLength);
+			if (currentTetramino->InitOk() == false) break;
+			else return currentTetramino;
 			break;
 		}
-		default:
-			break;
 		}
-		if (!currentTetramino || currentTetramino->InitOk() == false)
-		{
+		
 #ifdef LOGS
-			std::cerr << "Fail by making tetramino, abort.\n";
+		std::cerr << "Cannot make tetramino in progress, abort.\n";
 #endif
-			success = false;
-		}
-		return success;
+		return nullptr;
+		
+
+#undef int_
 	}
+
+
 
 	void Prog::move(Direction dir)
 	{
@@ -210,6 +289,8 @@ namespace tetris
 
 	void Prog::projectTetraminoToVirtual()
 	{
+		workSpace->WorkSpaceOperate(currentTetramino->RealTetramino());
+			//WorkSpaceOperation::projection);
 
 	}
 
